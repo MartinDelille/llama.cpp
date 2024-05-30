@@ -6248,7 +6248,7 @@ static struct ggml_tensor * ggml_rope_impl(
         struct ggml_tensor  * c,
         int                   n_dims,
         int                   mode,
-        int                   n_orig_ctx,
+        int                   n_ctx_orig,
         float                 freq_base,
         float                 freq_scale,
         float                 ext_factor,
@@ -6275,7 +6275,7 @@ static struct ggml_tensor * ggml_rope_impl(
 
     struct ggml_tensor * result = inplace ? ggml_view_tensor(ctx, a) : ggml_dup_tensor(ctx, a);
 
-    int32_t params[11] = { /*n_past*/ 0, n_dims, mode, /*n_ctx*/ 0, n_orig_ctx };
+    int32_t params[11] = { /*n_past*/ 0, n_dims, mode, /*n_ctx*/ 0, n_ctx_orig };
     memcpy(params +  5, &freq_base,    sizeof(float));
     memcpy(params +  6, &freq_scale,   sizeof(float));
     memcpy(params +  7, &ext_factor,   sizeof(float));
@@ -6322,7 +6322,7 @@ struct ggml_tensor * ggml_rope_ext(
         struct ggml_tensor  * c,
         int                   n_dims,
         int                   mode,
-        int                   n_orig_ctx,
+        int                   n_ctx_orig,
         float                 freq_base,
         float                 freq_scale,
         float                 ext_factor,
@@ -6330,7 +6330,7 @@ struct ggml_tensor * ggml_rope_ext(
         float                 beta_fast,
         float                 beta_slow) {
     return ggml_rope_impl(
-        ctx, a, b, c, n_dims, mode, n_orig_ctx, freq_base, freq_scale,
+        ctx, a, b, c, n_dims, mode, n_ctx_orig, freq_base, freq_scale,
         ext_factor, attn_factor, beta_fast, beta_slow, false
     );
 }
@@ -6342,7 +6342,7 @@ struct ggml_tensor * ggml_rope_ext_inplace(
         struct ggml_tensor  * c,
         int                   n_dims,
         int                   mode,
-        int                   n_orig_ctx,
+        int                   n_ctx_orig,
         float                 freq_base,
         float                 freq_scale,
         float                 ext_factor,
@@ -6350,7 +6350,7 @@ struct ggml_tensor * ggml_rope_ext_inplace(
         float                 beta_fast,
         float                 beta_slow) {
     return ggml_rope_impl(
-        ctx, a, b, c, n_dims, mode, n_orig_ctx, freq_base, freq_scale,
+        ctx, a, b, c, n_dims, mode, n_ctx_orig, freq_base, freq_scale,
         ext_factor, attn_factor, beta_fast, beta_slow, true
     );
 }
@@ -6361,7 +6361,7 @@ struct ggml_tensor * ggml_rope_custom(
         struct ggml_tensor  * b,
         int                   n_dims,
         int                   mode,
-        int                   n_orig_ctx,
+        int                   n_ctx_orig,
         float                 freq_base,
         float                 freq_scale,
         float                 ext_factor,
@@ -6369,7 +6369,7 @@ struct ggml_tensor * ggml_rope_custom(
         float                 beta_fast,
         float                 beta_slow) {
     return ggml_rope_impl(
-        ctx, a, b, NULL, n_dims, mode, n_orig_ctx, freq_base, freq_scale,
+        ctx, a, b, NULL, n_dims, mode, n_ctx_orig, freq_base, freq_scale,
         ext_factor, attn_factor, beta_fast, beta_slow, false
     );
 }
@@ -6380,7 +6380,7 @@ struct ggml_tensor * ggml_rope_custom_inplace(
         struct ggml_tensor  * b,
         int                   n_dims,
         int                   mode,
-        int                   n_orig_ctx,
+        int                   n_ctx_orig,
         float                 freq_base,
         float                 freq_scale,
         float                 ext_factor,
@@ -6388,7 +6388,7 @@ struct ggml_tensor * ggml_rope_custom_inplace(
         float                 beta_fast,
         float                 beta_slow) {
     return ggml_rope_impl(
-        ctx, a, b, NULL, n_dims, mode, n_orig_ctx, freq_base, freq_scale,
+        ctx, a, b, NULL, n_dims, mode, n_ctx_orig, freq_base, freq_scale,
         ext_factor, attn_factor, beta_fast, beta_slow, true
     );
 }
@@ -6402,7 +6402,7 @@ struct ggml_tensor * ggml_rope_back(
         struct ggml_tensor  * c,
         int                   n_dims,
         int                   mode,
-        int                   n_orig_ctx,
+        int                   n_ctx_orig,
         float                 freq_base,
         float                 freq_scale,
         float                 ext_factor,
@@ -6424,7 +6424,7 @@ struct ggml_tensor * ggml_rope_back(
 
     struct ggml_tensor * result = ggml_dup_tensor(ctx, a);
 
-    int32_t params[11] = { /*n_past*/ 0, n_dims, mode, /*n_ctx*/ 0, n_orig_ctx };
+    int32_t params[11] = { /*n_past*/ 0, n_dims, mode, /*n_ctx*/ 0, n_ctx_orig };
     memcpy(params +  5, &freq_base,    sizeof(float));
     memcpy(params +  6, &freq_scale,   sizeof(float));
     memcpy(params +  7, &ext_factor,   sizeof(float));
@@ -14249,8 +14249,8 @@ static void rope_yarn(
 
 // Apparently solving `n_rot = 2pi * x * base^((2 * max_pos_emb) / n_dims)` for x, we get
 // `corr_dim(n_rot) = n_dims * log(max_pos_emb / (n_rot * 2pi)) / (2 * log(base))`
-static float ggml_rope_yarn_corr_dim(int n_dims, int n_orig_ctx, float n_rot, float base) {
-    return n_dims * logf(n_orig_ctx / (n_rot * 2 * (float)M_PI)) / (2 * logf(base));
+static float ggml_rope_yarn_corr_dim(int n_dims, int n_ctx_orig, float n_rot, float base) {
+    return n_dims * logf(n_ctx_orig / (n_rot * 2 * (float)M_PI)) / (2 * logf(base));
 }
 
 static void ggml_rope_cache_init(
@@ -14270,11 +14270,11 @@ static void ggml_rope_cache_init(
 }
 
 GGML_CALL void ggml_rope_yarn_corr_dims(
-    int n_dims, int n_orig_ctx, float freq_base, float beta_fast, float beta_slow, float dims[2]
+    int n_dims, int n_ctx_orig, float freq_base, float beta_fast, float beta_slow, float dims[2]
 ) {
     // start and end correction dims
-    float start = floorf(ggml_rope_yarn_corr_dim(n_dims, n_orig_ctx, beta_fast, freq_base));
-    float end   =  ceilf(ggml_rope_yarn_corr_dim(n_dims, n_orig_ctx, beta_slow, freq_base));
+    float start = floorf(ggml_rope_yarn_corr_dim(n_dims, n_ctx_orig, beta_fast, freq_base));
+    float end   =  ceilf(ggml_rope_yarn_corr_dim(n_dims, n_ctx_orig, beta_slow, freq_base));
     dims[0] = MAX(0, start);
     dims[1] = MIN(n_dims - 1, end);
 }
@@ -14298,7 +14298,7 @@ static void ggml_compute_forward_rope_f32(
     const int n_dims     = ((int32_t *) dst->op_params)[1];
     const int mode       = ((int32_t *) dst->op_params)[2];
     //const int n_ctx      = ((int32_t *) dst->op_params)[3];
-    const int n_orig_ctx = ((int32_t *) dst->op_params)[4];
+    const int n_ctx_orig = ((int32_t *) dst->op_params)[4];
 
     memcpy(&freq_base,   (int32_t *) dst->op_params +  5, sizeof(float));
     memcpy(&freq_scale,  (int32_t *) dst->op_params +  6, sizeof(float));
@@ -14335,7 +14335,7 @@ static void ggml_compute_forward_rope_f32(
     const float theta_scale = powf(freq_base, -2.0f/n_dims);
 
     float corr_dims[2];
-    ggml_rope_yarn_corr_dims(n_dims, n_orig_ctx, freq_base, beta_fast, beta_slow, corr_dims);
+    ggml_rope_yarn_corr_dims(n_dims, n_ctx_orig, freq_base, beta_fast, beta_slow, corr_dims);
 
     const bool is_neox = mode & 2;
 
@@ -14428,7 +14428,7 @@ static void ggml_compute_forward_rope_f16(
     const int n_dims     = ((int32_t *) dst->op_params)[1];
     const int mode       = ((int32_t *) dst->op_params)[2];
     //const int n_ctx      = ((int32_t *) dst->op_params)[3];
-    const int n_orig_ctx = ((int32_t *) dst->op_params)[4];
+    const int n_ctx_orig = ((int32_t *) dst->op_params)[4];
     memcpy(&freq_base,   (int32_t *) dst->op_params +  5, sizeof(float));
     memcpy(&freq_scale,  (int32_t *) dst->op_params +  6, sizeof(float));
     memcpy(&ext_factor,  (int32_t *) dst->op_params +  7, sizeof(float));
@@ -14464,7 +14464,7 @@ static void ggml_compute_forward_rope_f16(
     const float theta_scale = powf(freq_base, -2.0f/n_dims);
 
     float corr_dims[2];
-    ggml_rope_yarn_corr_dims(n_dims, n_orig_ctx, freq_base, beta_fast, beta_slow, corr_dims);
+    ggml_rope_yarn_corr_dims(n_dims, n_ctx_orig, freq_base, beta_fast, beta_slow, corr_dims);
 
     const bool is_neox = mode & 2;
 
@@ -18233,7 +18233,7 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                     const int n_dims     = ((int32_t *) tensor->op_params)[1];
                     const int mode       = ((int32_t *) tensor->op_params)[2];
                     //const int n_ctx      = ((int32_t *) tensor->op_params)[3];
-                    const int n_orig_ctx = ((int32_t *) tensor->op_params)[4];
+                    const int n_ctx_orig = ((int32_t *) tensor->op_params)[4];
                     float freq_base, freq_scale, ext_factor, attn_factor, beta_fast, beta_slow;
 
                     memcpy(&freq_base,   (int32_t *) tensor->op_params +  5, sizeof(float));
@@ -18251,7 +18251,7 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                                 src2,
                                 n_dims,
                                 mode,
-                                n_orig_ctx,
+                                n_ctx_orig,
                                 freq_base,
                                 freq_scale,
                                 ext_factor,
@@ -18268,7 +18268,7 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                     const int n_dims     = ((int32_t *) tensor->op_params)[1];
                     const int mode       = ((int32_t *) tensor->op_params)[2];
                     //const int n_ctx      = ((int32_t *) tensor->op_params)[3];
-                    const int n_orig_ctx = ((int32_t *) tensor->op_params)[4];
+                    const int n_ctx_orig = ((int32_t *) tensor->op_params)[4];
                     float freq_base, freq_scale, ext_factor, attn_factor, beta_fast, beta_slow;
 
                     memcpy(&freq_base,   (int32_t *) tensor->op_params +  5, sizeof(float));
@@ -18286,7 +18286,7 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                                 src2,
                                 n_dims,
                                 mode,
-                                n_orig_ctx,
+                                n_ctx_orig,
                                 freq_base,
                                 freq_scale,
                                 ext_factor,
